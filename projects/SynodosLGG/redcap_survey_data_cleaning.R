@@ -5,6 +5,7 @@
 ### -------------------------------------------
 
 library(synapser)
+library(tidyverse)
 synLogin()
 
 options(stringsAsFactors = FALSE)
@@ -164,7 +165,6 @@ sample.dat$hospital_center[grep("Colorado",sample.dat$hospital_center)] <- "Chil
 sample.dat$hospital_center[grep("Philadelphia",sample.dat$hospital_center)] <- "Children's Hospital of Philadelphia"
 sample.dat$hospital_center[grep("Cincinnati",sample.dat$hospital_center)] <- "Cincinnati Children Hospital Medical Center"
 sample.dat$hospital_center[grep("Fondazione",sample.dat$hospital_center)] <- "Pediatric Neurosurgery, Fondazione A. Gemelli IRCCS"
-
 
 #drop columns - record_id, dag, survey_id, timestamp,email,compelete
 sample.dat <- sample.dat[, !colnames(sample.dat) %in% 
@@ -375,12 +375,45 @@ colnames(NF1_lgg) <- c("individualID",
                        "other",
                        "nf1_genotype2"
                         )
-merged_result <- merge(final.result, NF1_lgg[c("individualID", "nf1_genotype", "second_hits", "germline_NF1", "somatic_NF1")], by = "individualID", all.y = TRUE)                                                                                                                                                                                           #take synodosID and compare to individualID                                                                                                                                                                             
-merged_result <- merged_result[c(1:140),]#excel blank leftover and excess on the excel
+merged_result <- merge(final.result, NF1_lgg[c("individualID", "nf1_genotype", "second_hits", "germline_NF1", "somatic_NF1")], by = "individualID", all.y = TRUE)                                                                                                                                                                                           #take synodosID and compare to individualID                                                                                                                                  
+missing=which(is.na(merged_result$individualID))
+
+if(length(missing)>0)
+  merged_result <- merged_result[-missing,]#excel blank leftover and excess on the excel
 
 merged_results <- left_join(final.result, NF1_lgg[c("individualID", "nf1_genotype", "second_hits", "germline_NF1", "somatic_NF1")], by = "individualID")
 
 schema <- synGet('syn12164935')
+rows=synTableQuery('select * from syn12164935')
 # as.list(synGetTableColumns(schema))
 
+##ADD in project id!!!
+merged_results$synapseProject=rep('syn6633069',nrow(merged_results))
+merged_results$synapseProject[grep('SYN_NF',merged_results$individualID)]<-'syn5698493'
+
+synDelete(rows)
 table <- synStore(Table(schema,merged_results))
+
+##now merge again with binned data
+binned.data<-synTableQuery('select * from syn18407820')$asDataFrame()%>%select(Term,Actual,`Binned Value`)
+
+#now do each individually (since i can't figure out the dplyr)
+nf1.results<-merged_results%>%
+    left_join(subset(binned.data,Term=='tumorLocation')%>%
+          rename(tumorLocation=Actual,binnedTumorLocation=`Binned Value`)%>%
+          select(-Term),by='tumorLocation')%>%
+    left_join(subset(binned.data,Term=='his_read')%>%
+        rename(his_read=Actual,binnedHisRead=`Binned Value`)%>%
+        select(-Term),by='his_read')%>%
+  left_join(subset(binned.data,Term=='site_biopsy')%>%
+      rename(site_biopsy=Actual,binnedBiopsySite=`Binned Value`)%>%
+      select(-Term),by='site_biopsy')%>%subset(synapseProject=='syn5698493')
+
+
+##now let's create a prettier table
+schema <- synGet('syn18416527')
+rows=synTableQuery('select * from syn18416527')
+synDelete(rows)
+synStore(Table(schema,nf1.results))
+
+
