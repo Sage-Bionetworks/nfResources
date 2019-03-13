@@ -22,7 +22,7 @@ colnames(clinical.dat) <- c("record_id","dag","survey_id","timestamp","hospital_
                             "other_glioma_Other","other_glioma_txt","other_malignancy",
                             "other_malignancy_MPNST","other_malignancy_pheochromocytoma",
                             "other_malignancy_Other","other_malignancy_txt","pnf","adhd",
-                            "autistic","airway_disease","germline_nf1","complete")
+                            "autistic","airway_disease","hasGermlineNF1","complete")
 
 ##remove duplicated input
 #dups <- unique(clinical.dat$individualID[duplicated(clinical.dat$individualID)])
@@ -306,7 +306,7 @@ result$his_read <- apply(result,1,function(x){
 result$his_read_other <- NULL
 
 #replace Yes/No, Checked/Unchecked with True/False
-result$germline_nf1 <- sapply(result$germline_nf1,function(x){
+result$hasGermlineNF1 <- sapply(result$hasGermlineNF1,function(x){
   if(!is.na(x)){
     if(x=="Yes"){
       return(TRUE)
@@ -352,36 +352,38 @@ tbl <- synTableQuery("SELECT * FROM syn12164935")
 tbl.dat <- tbl$asDataFrame()
 temp <- tbl.dat[,c("ROW_ID","ROW_VERSION","synapseProject","individualID","specimenID")]
 
-final.result <- merge(temp,result,by = c("individualID","specimenID"),all.y = TRUE)
-final.result <- final.result[,colnames(tbl.dat[,1:36])]
+final.result <- merge(temp,result,by = c("individualID","specimenID"),all.y = TRUE)#%>%rename(hasGermlineNF1=Germline_NF1)
+#final.result <- final.result[,intersect(colnames(tbl.dat)[1:36]]
 
 # -------------------------------------------
 # read in 181005_NF1_LGG_Samples_for SAGE.xlsx to join some columns into final.result
 # -------------------------------------------
-NF1_lgg <- readxl::read_excel(synGet("syn18409961")$path)
+#NF1_lgg <- readxl::read_excel(synGet("syn18409961")$path)
+#updated to do table
+NF1_lgg <-synTableQuery('select * from syn18420940')$asDataFrame()%>%rename(individualID='Synodos_ID')
 #rename
-colnames(NF1_lgg) <- c("individualID",
-                       "hospital_center",
-                       "tumorEntity", 
-                       "identifier", 
-                       "alternativeID", 
-                       "sampleID_450k", 
-                       "subgroup", 
-                       "include_manuscript", 
-                       "germline_NF1",
-                       "somatic_NF1", 
-                       "nf1_genotype",
-                       "second_hits", 
-                       "other",
-                       "nf1_genotype2"
-                        )
-merged_result <- merge(final.result, NF1_lgg[c("individualID", "nf1_genotype", "second_hits", "germline_NF1", "somatic_NF1")], by = "individualID", all.y = TRUE)                                                                                                                                                                                           #take synodosID and compare to individualID                                                                                                                                  
+# colnames(NF1_lgg) <- c("individualID",
+#                        "hospital_center",
+#                        "tumorEntity", 
+#                        "identifier", 
+#                        "alternativeID", 
+#                        "sampleID_450k", 
+#                        "subgroup", 
+#                        "include_manuscript", 
+#                        "germline_NF1",
+#                        "somatic_NF1", 
+#                        "nf1_genotype",
+#                        "second_hits", 
+#                        "other",
+#                        "nf1_genotype2"
+#                         )
+merged_result <- merge(final.result, NF1_lgg[c("individualID", "NF1_genotype", "Second_hit (first)","Second_hit (second)",  "Somatic_NF1")], by = "individualID", all.y = TRUE)                                                                                                                                                                                           #take synodosID and compare to individualID                                                                                                                                  
 missing=which(is.na(merged_result$individualID))
 
 if(length(missing)>0)
   merged_result <- merged_result[-missing,]#excel blank leftover and excess on the excel
 
-merged_results <- left_join(final.result, NF1_lgg[c("individualID", "nf1_genotype", "second_hits", "germline_NF1", "somatic_NF1")], by = "individualID")
+merged_results <- left_join(final.result, NF1_lgg[c("individualID", "NF1_genotype","Second_hit (first)","Second_hit (second)", "Germline_NF1", "Somatic_NF1")], by = "individualID")
 
 schema <- synGet('syn12164935')
 rows=synTableQuery('select * from syn12164935')
