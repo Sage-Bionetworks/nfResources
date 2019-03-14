@@ -385,15 +385,16 @@ if(length(missing)>0)
 
 merged_results <- left_join(final.result, NF1_lgg[c("individualID", "NF1_genotype","Second_hit (first)","Second_hit (second)", "Germline_NF1", "Somatic_NF1")], by = "individualID")
 
-schema <- synGet('syn12164935')
-rows=synTableQuery('select * from syn12164935')
 # as.list(synGetTableColumns(schema))
 
 ##ADD in project id!!!
 merged_results$synapseProject=rep('syn6633069',nrow(merged_results))
 merged_results$synapseProject[grep('SYN_NF',merged_results$individualID)]<-'syn5698493'
 
-synDelete(rows)
+rows=synTableQuery('select * from syn12164935')
+res=synDelete(rows)
+
+schema <- synGet('syn12164935')
 table <- synStore(Table(schema,merged_results))
 
 ##now merge again with binned data
@@ -413,9 +414,10 @@ nf1.results<-merged_results%>%
 
 
 ##now let's create a prettier table
-schema <- synGet('syn18416527')
 rows=synTableQuery('select * from syn18416527')
-synDelete(rows)
+res=synDelete(rows)
+
+schema <- synGet('syn18416527')
 synStore(Table(schema,nf1.results))
 
 

@@ -10,18 +10,23 @@ if(length(oldies)>0)
 
 #TODO: remove 005
 tab<-tab[!tab$individualID%in%c("SYN_NF_005"),]
+tab<-mutate(tab,ageInMonths=age_biopsy_year*12+round(age_biopsy_month%%12))
+
+ggplot(tab)+geom_jitter(aes(y=ageInMonths,color=sex,x=binnedHisRead),position='dodge')+ theme(axis.text.x = element_text(angle = 90, hjust = 1))
+ggsave('sex_by_biopsy_age.png')
+
 
 ggplot(tab)+geom_bar(aes(fill=sex,x=binnedHisRead),position='dodge')+ theme(axis.text.x = element_text(angle = 90, hjust = 1))
-ggsave('age_by_sex_histology.png')
+ggsave('sex_by_histology.png')
 
 
 #TODO: do biopsy site instead of tumor location
 ggplot(tab)+geom_bar(aes(fill=sex,x=binnedBiopsySite),position='dodge')+ theme(axis.text.x = element_text(angle = 90, hjust = 1))
-ggsave('age_by_sex_location.png')
+ggsave('biopLocation_by_sex.png')
 
 #TODO: mutation heatmap with clinical data
 
-library(ggsurvminer)
+library(survminer)
 #biopsy in months
 biop_month=tab$age_biopsy_year*12+mod(tab$age_biopsy_month,12)
 
@@ -46,12 +51,21 @@ fit.hgg<-surv_fit(survival::Surv(diag,follow,event)~HGG,data=surv.df)
 #TODO: with/without followup
 fit.treat<-surv_fit(survival::Surv(diag,follow,event)~withFurtherTreatment,data=surv.df)
 ggsurvplot_facet(fit.treat,facet.by=c('LGG_PA'),data=surv.df)
-
+ggsave('lgg_pa_km.png')
 
 fit.treat<-surv_fit(survival::Surv(diag,follow,event)~LGG_PA,data=surv.df)
 ggsurvplot_facet(fit.treat,facet.by=c('withFurtherTreatment'),data=surv.df)
+ggsave('treatment_km.png')
 #ggsurvplot_facet(fit.treat,facet.by=c('HGG'),data=surv.df)
 
 #TODO: LGG PA vs other
 
+resultsdir='syn18423589'
+#store images here
+this.script='https://raw.githubusercontent.com/Sage-Bionetworks/nfResources/master/projects/SynodosLGG/getPerSampleInfo.R'
+files=c('sex_by_biopsy_age.png','sex_by_histology.png','lgg_pa_km.png','treatment_km.png','biopLocation_by_sex.png')
+tab='syn18416527'
+
+for(f in files)
+  synStore(File(f,parentId=resultsdir),used=tab,executed=this.script)
 
