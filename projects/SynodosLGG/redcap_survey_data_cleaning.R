@@ -166,6 +166,8 @@ sample.dat$hospital_center[grep("Philadelphia",sample.dat$hospital_center)] <- "
 sample.dat$hospital_center[grep("Cincinnati",sample.dat$hospital_center)] <- "Cincinnati Children Hospital Medical Center"
 sample.dat$hospital_center[grep("Fondazione",sample.dat$hospital_center)] <- "Pediatric Neurosurgery, Fondazione A. Gemelli IRCCS"
 
+
+
 #drop columns - record_id, dag, survey_id, timestamp,email,compelete
 sample.dat <- sample.dat[, !colnames(sample.dat) %in% 
                            c("record_id","dag","survey_id",
@@ -298,7 +300,7 @@ result$site_biopsy_txt <- NULL
 # his_read
 result$his_read <- apply(result,1,function(x){
   if(x["his_read"]=="Other"){
-    return(x["his_read_other"])
+    return(gsub("'","",x["his_read_other"],fixed=T))
   }
   return(x["his_read"])
 })
