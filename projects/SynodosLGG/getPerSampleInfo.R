@@ -12,61 +12,97 @@ if(length(oldies)>0)
 tab<-tab[!tab$individualID%in%c("SYN_NF_005"),]
 tab<-mutate(tab,ageInMonths=age_biopsy_year*12+round(age_biopsy_month%%12))
 
-##now work on generating tables
-#table 1
-#Demographic table:  includes age at biopsy, sex, race/ethnicity, nf1 inheritance, binned bx site, binned histo read
-
+##SECOND HIT
 tab<-tab%>%mutate(hasOtherMutation=ifelse(is.na(tab$`Second_hit (first)`),'No','Yes'))
 
-tab1=tab%>%group_by(binnedBiopsySite,binnedHisRead,sex,nf1_inheritance,clinical_status,hasOtherMutation)%>%
-  mutate(totalNum=n_distinct(individualID),meanAge=mean(age_biopsy_year),minAge=min(age_biopsy_year),maxAge=max(age_biopsy_year))%>%
-  select(totalNum,meanAge,minAge,maxAge)%>%
-  count(sex,nf1_inheritance,clinical_status,hasOtherMutation,meanAge,minAge,maxAge)%>%spread(sex,n)
-
-write.csv(tab1,'tab1_extraMutationDemographics.csv',row.names = F)
-#table2
+##LGG vs HGG
 tab<-tab%>%mutate(`LGG`=ifelse(tab$binnedHisRead=="LGG - PA",'LGG - PA','LGG - Other'))
 tab$`LGG`[grep('HGG',tab$binnedHisRead)]<-'HGG'
 
-tab2=tab%>%group_by(LGG,sex,clinical_status,binnedBiopsySite,hasOtherMutation)%>%
-  mutate(totalNum=n_distinct(individualID),meanAge=mean(age_biopsy_year),minAge=min(age_biopsy_year),maxAge=max(age_biopsy_year))%>%
-  select(totalNum,meanAge,minAge,maxAge)%>%
-  count(sex,hasOtherMutation,clinical_status,meanAge,minAge,maxAge)%>%spread(sex,n)
-
-write.csv(tab2,'tab2_lggPA_vs_otherDemographics.csv',row.names = F)
+##TREATMENT
 tab$priorTreatment=ifelse(tab$treatment_prior_biopsy=='No','No','Yes')
 tab$postTreatment=ifelse(tab$treatment_post_biopsy=='No','No','Yes')
-tab3<-tab%>%group_by(LGG,priorTreatment,postTreatment,binnedBiopsySite,hasOtherMutation,clinical_status)%>%
-  mutate(totalNum=n_distinct(individualID),meanAge=mean(age_biopsy_year),minAge=min(age_biopsy_year),maxAge=max(age_biopsy_year))%>%
-  select(totalNum,meanAge,minAge,maxAge)%>%
-  count(hasOtherMutation,priorTreatment,postTreatment,clinical_status,meanAge,minAge,maxAge)%>%
-  spread(LGG,n)
 
-write.csv(tab3,'tab3_priorPostTreatment_otherDemo.csv',row.names = F)
-
-tab$anyTreatment=apply(tab,1,function(x) ifelse(x[['priorTreatment']]=='Yes'||x[['postTreatment']]=='Yes','Yes','No'))
-tab4<-tab%>%group_by(LGG,anyTreatment,binnedBiopsySite,hasOtherMutation,clinical_status)%>%
-  mutate(totalNum=n_distinct(individualID),meanAge=mean(age_biopsy_year),minAge=min(age_biopsy_year),maxAge=max(age_biopsy_year))%>%
-  select(totalNum,meanAge,minAge,maxAge)%>%
-  count(hasOtherMutation,anyTreatment,clinical_status,meanAge,minAge,maxAge)%>%
-  spread(LGG,n)
-
-write.csv(tab4,'tab4_anyTreatment.csv',row.names = F)
-
+##AGE BINS
 tab$ageBin<-rep('over17',nrow(tab))
 tab$ageBin[which(tab$age_biopsy_year<18)]<-'11to17'
 tab$ageBin[which(tab$age_biopsy_year<11)]<-'under11'
 
+##now work on generating tables
+#table 1
+#Demographic table:  includes age at biopsy, sex, race/ethnicity, nf1 inheritance, binned bx site, binned histo read
 
-tab5<-tab%>%group_by(ageBin,LGG,anyTreatment,binnedBiopsySite,hasOtherMutation,clinical_status)%>%
-  count(hasOtherMutation,priorTreatment,postTreatment,clinical_status,ageBin)%>%
-  spread(ageBin,n)
+age.summary<-function(tab){
   
-write.csv(tab5,'tab5_binnedAgedemo.csv',row.names = F)
+}
+
+
+factor.by.group<-function(tab,cnames,grouping){
+  vals=unique(unlist(select(tab,!!as.name(grouping))))
+  do.call(rbind,lapply(vals,function(x){
+    tab1<-filter(tab,!!as.name(grouping)==x)
+    res<-factor.generator(tab1,cnames)
+    res$group=x
+    names(res)[which(colnames(res)=='group')]<-grouping
+    res
+  }))
+
+}
+
+factor.generator<-function(tab,cnames){
+  counted.tab<-do.call(rbind,lapply(cnames,function(val,tab1){
+    if(val=='age_biopsy_year'){
+      arr=as.numeric(unlist(select(tab,!!as.name(val))))
+      res=data.frame(value=paste(min(arr,na.rm=T),'-',max(arr,na.rm=T)),counts=mean(arr,na.rm=T),percent=median(arr,na.rm=T))
+    }else{
+      res=count(tab,!!as.name(val))%>%mutate(percent=100*n/sum(n))%>%rename(value=!!as.name(val),counts=n)
+  }
+      res$Variable=rep(val,nrow(res))
+      return(res%>%select(Variable,value,counts,percent))
+  }))
+}
+
+cnames=c('binnedTumorLocation','binnedBiopsySite','nf1_inheritance','clinical_status','hasOtherMutation','race_ethnicity','binnedHisRead','sex','age_biopsy_year')
+
+tab1<-factor.generator(tab,cnames)
+
+#tab1=tab%>%group_by(binnedBiopsySite,binnedHisRead,sex,nf1_inheritance,clinical_status,hasOtherMutation)%>%
+#  mutate(totalNum=n_distinct(individualID),meanAge=mean(age_biopsy_year),minAge=min(age_biopsy_year),maxAge=max(age_biopsy_year))%>%
+#  select(totalNum,meanAge,minAge,maxAge)%>%
+#  count(sex,nf1_inheritance,clinical_status,hasOtherMutation,meanAge,minAge,maxAge)%>%spread(sex,n)
+
+write.csv(tab1,'tab1_allSampleDemographics.csv',row.names = F)
+#table2
+
+cnames=c('binnedBiopsySite','nf1_inheritance','clinical_status','hasOtherMutation','sex','age_biopsy_year')
+
+tab2=factor.by.group(tab,cnames,'LGG')
+write.csv(tab2,'tab2_lggPA_vs_otherDemographics.csv',row.names = F)
+
+
+tab3<-factor.by.group(tab,cnames,'priorTreatment')
+
+
+write.csv(tab3,'tab3_priorTreatment_otherDemo.csv',row.names = F)
+
+tab4<-factor.by.group(tab,cnames,'postTreatment')
+
+write.csv(tab4,'tab3_postTreatment_otherDemo.csv',row.names = F)
+
+tab$anyTreatment=apply(tab,1,function(x) ifelse(x[['priorTreatment']]=='Yes'||x[['postTreatment']]=='Yes','Yes','No'))
+tab5<-factor.by.group(tab,cnames,'anyTreatment')
+
+
+write.csv(tab5,'tab4_anyTreatment.csv',row.names = F)
+
+
+
+tab6<-factor.by.group(tab,cnames,'ageBin')
+write.csv(tab6,'tab5_binnedAgedemo.csv',row.names = F)
 
 ##now figures 
-#ggplot(tab)+geom_jitter(aes(y=ageInMonths,color=sex,x=binnedHisRead),position='dodge')+ theme(axis.text.x = element_text(angle = 90, hjust = 1))
-#ggsave('sex_by_biopsy_age.png')
+ggplot(tab)+geom_jitter(aes(y=ageInMonths,color=sex,x=binnedHisRead),position='dodge')+ theme(axis.text.x = element_text(angle = 90, hjust = 1))
+ggsave('sex_by_biopsy_age.png')
 
 
 #ggplot(tab)+geom_bar(aes(fill=sex,x=binnedHisRead),position='dodge')+ theme(axis.text.x = element_text(angle = 90, hjust = 1))
@@ -116,7 +152,7 @@ ggsave('treatment_km.png')
 resultsdir='syn18423589'
 #store images here
 this.script='https://raw.githubusercontent.com/Sage-Bionetworks/nfResources/master/projects/SynodosLGG/getPerSampleInfo.R'
-files=c('sex_by_biopsy_age.png','sex_by_histology.png','lgg_pa_km.png','treatment_km.png','biopLocation_by_sex.png', dir('.')[grep('tab',dir('.'))])
+files=c(dir('.')[grep('png',dir('.'))], dir('.')[grep('tab',dir('.'))])
 tab='syn18416527'
 
 for(f in files)
