@@ -16,12 +16,13 @@ tab<-mutate(tab,ageInMonths=age_biopsy_year*12+round(age_biopsy_month%%12))
 tab<-tab%>%mutate(hasOtherMutation=ifelse(is.na(tab$`Second_hit (first)`),'No','Yes'))
 
 ##LGG vs HGG
-tab<-tab%>%mutate(`LGG`=ifelse(tab$binnedHisRead=="LGG - PA",'LGG - PA','LGG - Other'))
-tab$`LGG`[grep('HGG',tab$binnedHisRead)]<-'HGG'
+tab<-tab%>%mutate(`LGG-All`=ifelse(tab$binnedHisRead%in%c("LGG - PA","LGG - PA (PMA)"),'LGG - PA','LGG - Other'))
+tab$`LGG`[grep('HGG',tab$binnedHisRead)]<-'HGG - All'
 
 ##TREATMENT
 tab$priorTreatment=ifelse(tab$treatment_prior_biopsy=='No','No','Yes')
 tab$postTreatment=ifelse(tab$treatment_post_biopsy=='No','No','Yes')
+tab$`prior/post Treatment`=ifelse(apply(tab,1,function(x){ x[['priorTreatment']]=='Yes'||x[['postTreatment']]=='Yes'}),'Yes','No')
 
 ##AGE BINS
 tab$ageBin<-rep('over17',nrow(tab))
@@ -74,30 +75,26 @@ tab1<-factor.generator(tab,cnames)
 write.csv(tab1,'tab1_allSampleDemographics.csv',row.names = F)
 #table2
 
-cnames=c('binnedBiopsySite','nf1_inheritance','clinical_status','hasOtherMutation','sex','age_biopsy_year')
+cnames=c('binnedBiopsySite','nf1_inheritance','clinical_status','hasOtherMutation','sex','age_biopsy_year','binnedHisRead')
 
-tab2=factor.by.group(tab,cnames,'LGG')
+tab2=factor.by.group(subset(tab,LGG!='HGG - All'),cnames,'LGG')
 write.csv(tab2,'tab2_lggPA_vs_otherDemographics.csv',row.names = F)
 
 
-tab3<-factor.by.group(tab,cnames,'priorTreatment')
+#tab3<-factor.by.group(subset(tab,LGG!='HGG - All'),cnames,'priorTreatment')
+#write.csv(tab3,'tab3_priorTreatment_otherDemo.csv',row.names = F)
+#tab4<-factor.by.group(subset(tab,LGG!='HGG - All'),cnames,'postTreatment')
+#write.csv(tab4,'tab3_postTreatment_otherDemo.csv',row.names = F)
+#tab$anyTreatment=apply(tab,1,function(x) ifelse(x[['priorTreatment']]=='Yes'||x[['postTreatment']]=='Yes','Yes','No'))
 
-
-write.csv(tab3,'tab3_priorTreatment_otherDemo.csv',row.names = F)
-
-tab4<-factor.by.group(tab,cnames,'postTreatment')
-
-write.csv(tab4,'tab3_postTreatment_otherDemo.csv',row.names = F)
-
-tab$anyTreatment=apply(tab,1,function(x) ifelse(x[['priorTreatment']]=='Yes'||x[['postTreatment']]=='Yes','Yes','No'))
-tab5<-factor.by.group(tab,cnames,'anyTreatment')
+tab5<-factor.by.group(subset(tab,LGG!='HGG - All'),cnames,'prior/post Treatment')
 
 
 write.csv(tab5,'tab4_anyTreatment.csv',row.names = F)
 
 
 
-tab6<-factor.by.group(tab,cnames,'ageBin')
+tab6<-factor.by.group(subset(tab,LGG!='HGG - All'),cnames,'ageBin')
 write.csv(tab6,'tab5_binnedAgedemo.csv',row.names = F)
 
 ##now figures 
@@ -153,8 +150,8 @@ resultsdir='syn18423589'
 #store images here
 this.script='https://raw.githubusercontent.com/Sage-Bionetworks/nfResources/master/projects/SynodosLGG/getPerSampleInfo.R'
 files=c(dir('.')[grep('png',dir('.'))], dir('.')[grep('tab',dir('.'))])
-tab='syn18416527'
+tabId='syn18416527'
 
 for(f in files)
-  synStore(File(f,parentId=resultsdir),used=tab,executed=this.script)
+  synStore(File(f,parentId=resultsdir),used=tabId,executed=this.script)
 
