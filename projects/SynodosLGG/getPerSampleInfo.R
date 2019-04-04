@@ -3,6 +3,9 @@ require(synapser)
 synLogin()
 tab<-synapser::synTableQuery("SELECT * FROM syn18416527 WHERE ( ( \"synapseProject\" = 'syn5698493' ) )")$asDataFrame()
 
+##reducing by mol.data
+have.mol<-synapser::synTableQuery("SELECT Synodos_ID FROM syn18420940 where Include_manuscript = 1")$asDataFrame()
+
 #TODO: move 2 65yos
 oldies<-which(tab$age_biopsy_year>25)
 if(length(oldies)>0)
@@ -12,11 +15,16 @@ if(length(oldies)>0)
 tab<-tab[!tab$individualID%in%c("SYN_NF_005"),]
 tab<-mutate(tab,ageInMonths=age_biopsy_year*12+round(age_biopsy_month%%12))
 
+overlaps<-intersect(tab$individualID,have.mol$Synodos_ID)
+print(paste('have',length(overlaps),'patients with molecular and clinical data'))
+tab<-subset(tab,individualID%in%overlaps)
+
 ##SECOND HIT
 tab<-tab%>%mutate(hasOtherMutation=ifelse(is.na(tab$`Second_hit (first)`),'No','Yes'))
 
 ##LGG vs HGG
 tab<-tab%>%mutate(`LGG-All`=ifelse(tab$binnedHisRead%in%c("LGG - PA","LGG - PA (PMA)"),'LGG - PA','LGG - Other'))
+tab$`LGG`=rep('LGG',nrow(tab))
 tab$`LGG`[grep('HGG',tab$binnedHisRead)]<-'HGG - All'
 
 ##TREATMENT
@@ -53,13 +61,14 @@ factor.by.group<-function(tab,cnames,grouping){
 factor.generator<-function(tab,cnames){
   counted.tab<-do.call(rbind,lapply(cnames,function(val,tab1){
     if(val=='age_biopsy_year'){
-      arr=as.numeric(unlist(select(tab,!!as.name(val))))
-      res=data.frame(value=paste(min(arr,na.rm=T),'-',max(arr,na.rm=T)),counts=mean(arr,na.rm=T),percent=median(arr,na.rm=T))
+      di=unique(select(tab,individualID,!!as.name(val)))
+      arr=as.numeric(unlist(select(di,!!as.name(val))))
+      res=data.frame(value=paste(min(arr,na.rm=T),'-',max(arr,na.rm=T)),patients=mean(arr,na.rm=T),samples=median(arr,na.rm=T),percentPatient=NA,percentSamples=NA)
     }else{
-      res=count(tab,!!as.name(val))%>%mutate(percent=100*n/sum(n))%>%rename(value=!!as.name(val),counts=n)
+      res=tab%>%group_by(!!as.name(val))%>%summarize(patients=n_distinct(individualID),samples=n_distinct(specimenID))%>%mutate(percentPatient=100*patients/sum(patients),percentSamples=100*samples/sum(samples))%>%rename(value=!!as.name(val))
   }
       res$Variable=rep(val,nrow(res))
-      return(res%>%select(Variable,value,counts,percent))
+      return(res%>%select(Variable,value,patients,samples,percentPatient,percentSamples))
   }))
 }
 
@@ -77,8 +86,11 @@ write.csv(tab1,'tab1_allSampleDemographics.csv',row.names = F)
 
 cnames=c('binnedBiopsySite','nf1_inheritance','clinical_status','hasOtherMutation','sex','age_biopsy_year','binnedHisRead')
 
-tab2=factor.by.group(subset(tab,LGG!='HGG - All'),cnames,'LGG')
+tab2=factor.by.group(subset(tab,LGG!='HGG - All'),cnames,'LGG-All')
 write.csv(tab2,'tab2_lggPA_vs_otherDemographics.csv',row.names = F)
+
+tab3=factor.by.group(tab,cnames,'LGG')
+write.csv(tab3,'tab2_lgg_vs_hggDemographics.csv',row.names = F)
 
 
 #tab3<-factor.by.group(subset(tab,LGG!='HGG - All'),cnames,'priorTreatment')
@@ -94,8 +106,12 @@ write.csv(tab5,'tab4_anyTreatment.csv',row.names = F)
 
 
 
-tab6<-factor.by.group(subset(tab,LGG!='HGG - All'),cnames,'ageBin')
+tab6<-factor.by.group(tab,cnames,'ageBin')
 write.csv(tab6,'tab5_binnedAgedemo.csv',row.names = F)
+
+
+tab6<-factor.by.group(tab,cnames,'hasOtherMutation')
+write.csv(tab6,'ta6_otherMutationdemo.csv',row.names = F)
 
 ##now figures 
 ggplot(tab)+geom_jitter(aes(y=ageInMonths,color=sex,x=binnedHisRead),position='dodge')+ theme(axis.text.x = element_text(angle = 90, hjust = 1))
