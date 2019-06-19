@@ -184,7 +184,7 @@ rule disambiguate:
     shell:
         "ngs_disambiguate {input.human} {input.mouse} -s {params.prefix} -a star -o {params.outdir}"
       
-rule disambig_to_fasta:
+rule disambig_to_fastq:
     input:
         BASE_DIR + "04_disambiguate/{ind}.disambiguatedSpeciesA.bam"
     output:
