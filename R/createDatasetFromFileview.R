@@ -12,11 +12,15 @@ dest_folder_id='syn6098029'
 fv_id='syn11614207'
 dest_folder_id='syn8466184'
 
+#mattingly data
+fv_id='syn11581628'
+dest_folder_id='syn18637022'
+
 require(synapser)
 synLogin()
 
-ids<-synTableQuery(paste('select id from',fv_id))$asDataFrame()
-ids<-setdiff(ids$id,'syn17095981')#get rid of the id of the zip file itself
+ids<-synTableQuery(paste('select id from',fv_id))$asDataFrame()$id
+#ids<-setdiff(ids$id,'syn17095981')#get rid of the id of the zip file itself
 dir.create(fv_id)
 
 paths<-sapply(ids,function(x) {

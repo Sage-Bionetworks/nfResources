@@ -331,23 +331,23 @@ result$he_slide <- sapply(result$he_slide,function(x){
 })
 
 # replace 0 with NA
-result$age_last_follow_up_year <- sapply(result$age_last_follow_up_year,function(x){
-  if(!is.na(x)){
-    if(x==0){
-      return(NA)
-    }
-  }
-  return(x)
-})
+#result$age_last_follow_up_year <- sapply(result$age_last_follow_up_year,function(x){
+#  if(!is.na(x)){
+#    if(x==0){
+#      return(NA)
+#    }
+#  }
+#  return(x)
+#})
 
-result$age_last_follow_up_month <- sapply(result$age_last_follow_up_month,function(x){
-  if(!is.na(x)){
-    if(x==0.0){
-      return(NA)
-    }
-  }
-  return(x)
-})
+#result$age_last_follow_up_month <- sapply(result$age_last_follow_up_month,function(x){
+#  if(!is.na(x)){
+#    if(x==0.0){
+#      return(NA)
+#    }
+#  }
+#  return(x)
+#})
 
 ###get synapse table rownames to update
 tbl <- synTableQuery("SELECT * FROM syn12164935")
@@ -379,14 +379,14 @@ NF1_lgg <-synTableQuery('select * from syn18420940')$asDataFrame()%>%rename(indi
 #                        "other",
 #                        "nf1_genotype2"
 #                         )
-merged_result <- merge(final.result, NF1_lgg[c("individualID", "NF1_genotype", "Second_hit (first)","Second_hit (second)",  "Somatic_NF1")], by = "individualID", all.y = TRUE)                                                                                                                                                                                           #take synodosID and compare to individualID                                                                                                                                  
+merged_result <- merge(final.result, NF1_lgg[c("individualID", "NF1_genotype", "Second_hit (first)","Second_hit (second)",  "Somatic_NF1","Include_manuscript")], by = "individualID", all.y = TRUE)
+
 missing=which(is.na(merged_result$individualID))
 
 if(length(missing)>0)
   merged_result <- merged_result[-missing,]#excel blank leftover and excess on the excel
 
-merged_results <- left_join(final.result, NF1_lgg[c("individualID", "NF1_genotype","Second_hit (first)","Second_hit (second)", "Germline_NF1", "Somatic_NF1")], by = "individualID")
-
+merged_results <- left_join(final.result, NF1_lgg[c("individualID", "NF1_genotype","Second_hit (first)","Second_hit (second)", "Germline_NF1", "Somatic_NF1",'Include_manuscript')], by = "individualID")%>%mutate(`has molecular data`=(!is.na(Include_manuscript)))%>%select(-Include_manuscript)
 # as.list(synGetTableColumns(schema))
 
 ##ADD in project id!!!

@@ -15,6 +15,17 @@ if(length(oldies)>0)
 tab<-tab[!tab$individualID%in%c("SYN_NF_005"),]
 tab<-mutate(tab,ageInMonths=age_biopsy_year*12+round(age_biopsy_month%%12))
 
+#re-order binned his read
+tab$binnedHisRead=factor(tab$binnedHisRead,levels=c("LGG - PA",
+  "LGG - PA (PMA)",
+  "LGG - PA with atypical features",
+  "LGG - grade 2 (DA)",
+  "LGG - Grade 2 (OA)",
+  "LGG - grade 2 (PXA)",
+  "LGG - NOS",
+  "Brain Tumor - NOS",
+  "HGG - GBM"))
+
 overlaps<-intersect(tab$individualID,have.mol$Synodos_ID)
 print(paste('have',length(overlaps),'patients with molecular and clinical data'))
 tab<-subset(tab,individualID%in%overlaps)
@@ -23,7 +34,7 @@ tab<-subset(tab,individualID%in%overlaps)
 tab<-tab%>%mutate(hasOtherMutation=ifelse(is.na(tab$`Second_hit (first)`),'No','Yes'))
 
 ##LGG vs HGG
-tab<-tab%>%mutate(`LGG-All`=ifelse(tab$binnedHisRead%in%c("LGG - PA","LGG - PA (PMA)"),'LGG - PA','LGG - Other'))
+tab<-tab%>%mutate(`LGG-All`=ifelse(tab$binnedHisRead%in%c("LGG - PA"),'LGG - PA','LGG - Other'))
 tab$`LGG`=rep('LGG',nrow(tab))
 tab$`LGG`[grep('HGG',tab$binnedHisRead)]<-'HGG - All'
 
@@ -65,14 +76,14 @@ factor.generator<-function(tab,cnames){
       arr=as.numeric(unlist(select(di,!!as.name(val))))
       res=data.frame(value=paste(min(arr,na.rm=T),'-',max(arr,na.rm=T)),patients=mean(arr,na.rm=T),samples=median(arr,na.rm=T),percentPatient=NA,percentSamples=NA)
     }else{
-      res=tab%>%group_by(!!as.name(val))%>%summarize(patients=n_distinct(individualID),samples=n_distinct(specimenID))%>%mutate(percentPatient=100*patients/sum(patients),percentSamples=100*samples/sum(samples))%>%rename(value=!!as.name(val))
+      res=tab%>%group_by(!!as.name(val))%>%summarize(patients=n_distinct(individualID),samples=n_distinct(specimenID))%>%mutate(percentPatient=format(100*patients/sum(patients),digits=2),percentSamples=format(100*samples/sum(samples),digits=2))%>%rename(value=!!as.name(val))
   }
       res$Variable=rep(val,nrow(res))
       return(res%>%select(Variable,value,patients,samples,percentPatient,percentSamples))
   }))
 }
 
-cnames=c('binnedTumorLocation','binnedBiopsySite','nf1_inheritance','clinical_status','hasOtherMutation','race_ethnicity','binnedHisRead','sex','age_biopsy_year')
+cnames=c('age_biopsy_year','sex','race_ethnicity','nf1_inheritance','hasOtherMutation','binnedBiopsySite','binnedHisRead','prior/post Treatment','clinical_status')
 
 tab1<-factor.generator(tab,cnames)
 
@@ -84,7 +95,7 @@ tab1<-factor.generator(tab,cnames)
 write.csv(tab1,'tab1_allSampleDemographics.csv',row.names = F)
 #table2
 
-cnames=c('binnedBiopsySite','nf1_inheritance','clinical_status','hasOtherMutation','sex','age_biopsy_year','binnedHisRead')
+cnames=c('age_biopsy_year','sex','nf1_inheritance','hasOtherMutation','binnedBiopsySite','binnedHisRead','prior/post Treatment','clinical_status')
 
 tab2=factor.by.group(subset(tab,LGG!='HGG - All'),cnames,'LGG-All')
 write.csv(tab2,'tab2_lggPA_vs_otherDemographics.csv',row.names = F)
