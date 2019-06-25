@@ -5,7 +5,7 @@ This respository serves as a catch-all to handle various [NF-OSI](http://synapse
 Here is a summary of what we currently have.
 
 ##### Milestone Reports
-Milestone reporting is currenlty in [./milestoneReports/] and maintains code required to identify files updated based on milestone.
+Milestone reporting is currenlty in (milestoneReports/) and maintains code required to identify files updated based on milestone.
 
 ##### Project dashboarding
 For individual funders we have built two shiny-based apps that track all ongoing activity.
@@ -13,8 +13,8 @@ For individual funders we have built two shiny-based apps that track all ongoing
 
 | Funding Agency | Dashboard Location | Code Base | Table Updates |
 | ------------   | ------------------ | --------- | ------------- | 
-| NTAP | https://shinypro.synapse.org/users/xdoan/NTAP_shiny/ | | |
-| CTF | https://shinypro.synapse.org/users/xdoan/CTF_shiny/ | | |
+| NTAP | https://shinypro.synapse.org/users/xdoan/NTAP_shiny/ | https://github.com/xdoan/NTAP_shiny | |
+| CTF | https://shinypro.synapse.org/users/xdoan/CTF_shiny/ | https://github.com/xdoan/CTF_shiny | |
 
 
 ##### Miscellaneous scripts
