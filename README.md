@@ -10,8 +10,8 @@ Milestone reporting is currenlty in [./milestoneReports/] and maintains code req
 ##### Project dashboarding
 For individual funders we have built two shiny-based apps that track all ongoing activity.
 
-|Funding Agency| Dashboard Location|Code Base | Table Updates|
-| --- | --- | --- | --- | ---|
+| Funding Agency | Dashboard Location | Code Base | Table Updates |
+| ------------   | --- | --- | --- | ---|
 | NTAP | https://shinypro.synapse.org/users/xdoan/NTAP_shiny/ | | |
 | CTF | https://shinypro.synapse.org/users/xdoan/CTF_shiny/ | | |
 
