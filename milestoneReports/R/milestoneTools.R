@@ -1,8 +1,22 @@
 ##primary functions to retrieve project information
 
+##to run on ntap:
+## Rscript milestoneTools.R -p syn10147576 -c "cNF Initiative"
 
 pvid='syn10147576'
 con='cNF Initiative'
+fvid='syn16858331'
+
+parseArgs<-function(){
+  require(optparse)  
+  option_list<-list(
+        make_option(c('-p','--projectview'),dest='pvid',help='Project view to query',default=pvid),
+        make_option(c('-c','--consortium'),dest='cons',help='Name of consortium',default=con),
+        make_option(c('-f','--fileview'),dest='fvid',help='File view id',default=fvid))
+  args=parse_args(OptionParser(option_list = option_list))
+  return(args)
+  
+}
 
 # We need to list all projects to generate reports for
 # @export 
@@ -20,13 +34,61 @@ getProjectsByConsortium<-function(pvid,consortium){
 
 #get the distinct milsteons for each project id
 # @export
-fvid='syn8077013'
+
 sid='11374339'
 getMilestonesForProject<-function(fvid,sid){
   require(synapser)
   synapser::synLogin()
-  query=paste0("SELECT distinct milestoneReport from ',fvid,' where studyId = '",sid,"'")
+  query=paste0("SELECT distinct studyId,reportMilestone from ",fvid," where studyId = '",sid,"'")
   return(synapser::synTableQuery(query)$asDataFrame())
 }
 
+getReportsDir<-function(synid){
+  
+    chidren=synGetChildren(synid, includeTypes=list( "folder"), sortBy="NAME", sortDirection="ASC")$asList()
+    for(c in children)
+      if(c$name=='Reports')
+        return(c$id)
+   res=synStore(Folder('Reports',parent=synid))
+   return(res$properties$id)
+}
 
+makeMilestoneReport<-function(study,milestone,name,fvid){
+  library(rmarkdown)
+  this.script='https://raw.githubusercontent.com/Sage-Bionetworks/nfResources/master/milestoneReports/R/milestoneTools.R'
+  if(is.na(milestone))
+    return(NA)
+  rmd="milestoneReports/generic_nf_milestone_report.Rmd"
+  fname=paste0('NFOSI_',milestone,'monthMilestoneReport_',study,'.html')
+  f<-rmarkdown::render(rmd,rmarkdown::html_document(),
+      output_file=fname,
+      params=list(projectid=study,
+        projectname=name,
+        fvid=fvid,
+        milestone=milestone))
+  parentid=synGetChildren(study)
+  res=synStore(File(fname,parent),executed=this.script,used=fvid)
+  return(res$properties$id)
+}
+
+# generate rmd files, upload to projects, and link
+# @export
+main<-function(){
+  
+  args<-parseArgs()
+  
+  #what are all the projects? 
+  res=getProjectsByConsortium(args$pvid,args$cons)
+  
+  require(dplyr)
+  #what milestones do we have?
+  mstons=do.call(rbind,lapply(res$id,function(x) getMilestonesForProject(fvid=args$fvid,sid=x)))%>%
+   left_join(select(res,studyId='id',name),by='studyId')
+  
+  #now for each project, get milestone reports and upload
+  files=apply(mstons,1,function(x) makeMilestoneReport(study=x[["studyId"]],milestone=x[["milestone"]],name=x[["name"]],fvid=args$fvid))
+  tab<-data.frame(mstons,reports=files)
+  synStore(synBuildTable(paste(args$cons,'Milestone Reports'),parentid='syn4939478',tab))
+}
+
+main()
