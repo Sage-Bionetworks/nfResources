@@ -12,7 +12,8 @@ parseArgs<-function(){
   option_list<-list(
         make_option(c('-p','--projectview'),dest='pvid',help='Project view to query',default=pvid),
         make_option(c('-c','--consortium'),dest='cons',help='Name of consortium',default=con),
-        make_option(c('-f','--fileview'),dest='fvid',help='File view id',default=fvid))
+        make_option(c('-f','--fileview'),dest='fvid',help='File view id',default=fvid),
+        make_option(c('-t','--table'),dest='updatetable',default=TRUE,help='UpdateTable'))
   args=parse_args(OptionParser(option_list = option_list))
   return(args)
   
@@ -45,10 +46,12 @@ getMilestonesForProject<-function(fvid,sid){
 
 getReportsDir<-function(synid){
   
-    chidren=synGetChildren(synid, includeTypes=list( "folder"), sortBy="NAME", sortDirection="ASC")$asList()
+    children=synGetChildren(synid, includeTypes=list( "folder"), sortBy="NAME", sortDirection="ASC")$asList()
+    
     for(c in children)
       if(c$name=='Reports')
         return(c$id)
+    
    res=synStore(Folder('Reports',parent=synid))
    return(res$properties$id)
 }
@@ -59,15 +62,21 @@ makeMilestoneReport<-function(study,milestone,name,fvid){
   if(is.na(milestone))
     return(NA)
   rmd="milestoneReports/generic_nf_milestone_report.Rmd"
-  fname=paste0('NFOSI_',milestone,'monthMilestoneReport_',study,'.html')
-  f<-rmarkdown::render(rmd,rmarkdown::html_document(),
+  fname=paste(getwd(),'/NFOSI_',milestone,'monthMilestoneReport_',study,'.html',sep='')
+  f<-NA
+  
+  try(f<-rmarkdown::render(rmd,rmarkdown::html_document(),
       output_file=fname,
       params=list(projectid=study,
         projectname=name,
         fvid=fvid,
-        milestone=milestone))
-  parentid=synGetChildren(study)
-  res=synStore(File(fname,parent),executed=this.script,used=fvid)
+        milestone=milestone)))
+  if(is.na(f))
+    return(f)
+  parentid=getReportsDir(study)
+
+  res=synapser::synStore(synapser::File(path=fname,parent=parentid),executed=this.script,used=fvid)
+
   return(res$properties$id)
 }
 
@@ -86,9 +95,12 @@ main<-function(){
    left_join(select(res,studyId='id',name),by='studyId')
   
   #now for each project, get milestone reports and upload
-  files=apply(mstons,1,function(x) makeMilestoneReport(study=x[["studyId"]],milestone=x[["milestone"]],name=x[["name"]],fvid=args$fvid))
+  files=apply(mstons,1,function(x) makeMilestoneReport(study=x[["studyId"]],milestone=x[["reportMilestone"]],name=x[["name"]],fvid=args$fvid))
   tab<-data.frame(mstons,reports=files)
-  synStore(synBuildTable(paste(args$cons,'Milestone Reports'),parentid='syn4939478',tab))
+  
+  if(args$updatetable){
+  synStore(synBuildTable(paste(args$cons,'Milestone Reports'),parent='syn4939478',values=tab))
+  }
 }
 
 main()

@@ -78,7 +78,19 @@ six_mo_fileview <- synTableQuery(query)$asDataFrame()
 ```
 
 ```{r, include = FALSE}
+
 test_name_deliverables <- subset(deliverables_survery, deliverables_survery$`Project Name` == projectname )
+
+
+if(nrow(test_name_deliverables)==0){
+  test_name_deliverables=data.frame(
+      `dummy1`='dummy',
+      `dummy2`='dummy',
+      `Project Name`=projectname,
+      `Milestone (months)`=milestone,
+      `Assay`=unique(six_mo_fileview$assay),
+      `Proposed Number of Samples`=0)
+}
 
 #get first assay listed (brightfield microscopy )
 six_mo_brightfield <- subset(six_mo_fileview, six_mo_fileview$assay == test_name_deliverables$Assay) 
