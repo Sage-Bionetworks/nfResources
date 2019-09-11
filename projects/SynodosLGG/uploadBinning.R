@@ -19,3 +19,5 @@ full.tab<-rbind(loc,hist,biop)
 synStore(synBuildTable('LGG Mappings',parent='syn5698493',full.tab))
 
 
+
+##upload subgroups

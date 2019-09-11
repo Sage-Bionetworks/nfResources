@@ -8,7 +8,7 @@ con='cNF Initiative'
 fvid='syn16858331'
 
 parseArgs<-function(){
-  require(optparse)  
+  require(optparse)
   option_list<-list(
         make_option(c('-p','--projectview'),dest='pvid',help='Project view to query',default=pvid),
         make_option(c('-c','--consortium'),dest='cons',help='Name of consortium',default=con),
@@ -16,11 +16,11 @@ parseArgs<-function(){
         make_option(c('-t','--table'),dest='updatetable',default=TRUE,help='UpdateTable'))
   args=parse_args(OptionParser(option_list = option_list))
   return(args)
-  
+
 }
 
 # We need to list all projects to generate reports for
-# @export 
+# @export
 getProjectsByConsortium<-function(pvid,consortium){
   require(synapser)
   synLogin()
@@ -30,7 +30,7 @@ getProjectsByConsortium<-function(pvid,consortium){
   #print(query)
   res=synTableQuery(query)$asDataFrame()
   return(res)
-  
+
 }
 
 #get the distinct milsteons for each project id
@@ -45,18 +45,18 @@ getMilestonesForProject<-function(fvid,sid){
 }
 
 getReportsDir<-function(synid){
-  
+
     children=synGetChildren(synid, includeTypes=list( "folder"), sortBy="NAME", sortDirection="ASC")$asList()
-    
+
     for(c in children)
       if(c$name=='Reports')
         return(c$id)
-    
+
    res=synStore(Folder('Reports',parent=synid))
    return(res$properties$id)
 }
 
-makeMilestoneReport<-function(study,milestone,name,fvid){
+makeMilestoneReport<-function(study,milestone,name,fvid,cons){
   library(rmarkdown)
   this.script='https://raw.githubusercontent.com/Sage-Bionetworks/nfResources/master/milestoneReports/R/milestoneTools.R'
   if(is.na(milestone))
@@ -64,7 +64,7 @@ makeMilestoneReport<-function(study,milestone,name,fvid){
   rmd="milestoneReports/generic_nf_milestone_report.Rmd"
   fname=paste(getwd(),'/NFOSI_',milestone,'monthMilestoneReport_',study,'.html',sep='')
   f<-NA
-  
+
   try(f<-rmarkdown::render(rmd,rmarkdown::html_document(),
       output_file=fname,
       params=list(projectid=study,
@@ -75,7 +75,15 @@ makeMilestoneReport<-function(study,milestone,name,fvid){
     return(f)
   parentid=getReportsDir(study)
 
-  res=synapser::synStore(synapser::File(path=fname,parent=parentid),executed=this.script,used=fvid)
+  res=synapser::synStore(synapser::File(path=fname,
+                                        parent=parentid,
+                                        annotations=list(consortium=cons,
+                                                         resourceType='report',
+                                                         fileFormat='html',
+                                                         studyId=study,
+                                                         studyName=name,
+                                                         reportMilestone=milestone)),
+                         executed=this.script,used=fvid)
 
   return(res$properties$id)
 }
@@ -83,23 +91,24 @@ makeMilestoneReport<-function(study,milestone,name,fvid){
 # generate rmd files, upload to projects, and link
 # @export
 main<-function(){
-  
+
   args<-parseArgs()
-  
-  #what are all the projects? 
+
+  #what are all the projects?
   res=getProjectsByConsortium(args$pvid,args$cons)
-  
+
   require(dplyr)
   #what milestones do we have?
   mstons=do.call(rbind,lapply(res$id,function(x) getMilestonesForProject(fvid=args$fvid,sid=x)))%>%
    left_join(select(res,studyId='id',name),by='studyId')
-  
+
   #now for each project, get milestone reports and upload
-  files=apply(mstons,1,function(x) makeMilestoneReport(study=x[["studyId"]],milestone=x[["reportMilestone"]],name=x[["name"]],fvid=args$fvid))
+  files=apply(mstons,1,function(x) makeMilestoneReport(study=x[["studyId"]],milestone=x[["reportMilestone"]],name=x[["name"]],fvid=args$fvid,cons=args$cons))
   tab<-data.frame(mstons,reports=files)
-  
-  if(args$updatetable){
-  synStore(synBuildTable(paste(args$cons,'Milestone Reports'),parent='syn4939478',values=tab))
+
+    if(args$updatetable){
+        tab<-synBuildTable(paste(args$cons,'Milestone Reports'),parent='syn4939478',values=tab)
+        synStore(tab)
   }
 }
 
