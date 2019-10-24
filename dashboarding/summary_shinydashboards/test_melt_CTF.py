@@ -1,4 +1,3 @@
-
 # coding: utf-8
 
 # In[1]:
@@ -76,7 +75,7 @@ p_atr = ['projectName',
 ### from table syn16787123
 p_view_atr = ['projectName',
               'id',
-              'projectFileviewId',
+              'studyFileviewId',
               'projectStatus',
               'dataStatus',
               'fundingAgency',
@@ -118,7 +117,7 @@ f_atr = ['id',
         'createdOn',
         'modifiedOn']
 
-# csbc project info integration 
+# csbc project info integration
 csbc_atr = ["projectId",
             "name_project",
             "consortium",
@@ -262,7 +261,9 @@ len(set(dfs[1].projectId.unique()) - set(dfs[0].projectId.unique()))
 
 
 # Associate publications information to projects
-project_info_df = pandas.merge(dfs[1], dfs[0], on=['projectId','projectName', 'fundingAgency', 'diseaseFocus', 'tumorType'], how='left')
+project_info_df = pandas.merge(dfs[1].drop(['featured'],axis=1), dfs[0].drop(['featured'],axis=1), on=['projectId','projectName', 'fundingAgency', 'diseaseFocus', 'tumorType','studyName','studyId','manifestation'], how='left')
+
+#project_info_df = pandas.merge(dfs[1], dfs[0], on=['projectId','projectName', 'fundingAgency', 'diseaseFocus', 'tumorType'], how='left')
 
 
 # In[16]:
@@ -271,14 +272,14 @@ project_info_df = pandas.merge(dfs[1], dfs[0], on=['projectId','projectName', 'f
 project_info_df = project_info_df[
     [ 'projectName',
      'projectId',
-     'projectFileviewId',
+     'studyFileviewId',
      'dataStatus',
      'fundingAgency',
      'projectLeads',
      'institutions',
      'tumorType',
      'diseaseFocus',
-     'citation', 
+     'citation',
      'doi']
 ]
 
@@ -357,22 +358,47 @@ final_df = pandas.merge( dfs[1], file_info_df, on= ['projectId'], how='left')
 # In[39]:
 
 
-final_df.loc[final_df['studyName'].isin(nf1)]
+
 
 
 # In[40]:
 
 
 final_df = final_df.drop(
-    ["summary_x",
+    ["summary_y",
      "summarySource",
      "featured_x",
      "consortium_x",
      "fundingAgency_y",
      "featured_y",
      "tumorType_y",
-     "etag"]
+     "etag",
+     "studyName_y",
+      "consortium_x",
+      "studyId_y",
+      "manifestation_y",
+      "diseaseFocus_y",
+      "studyLeads",
+      "projectStatus",
+      "cellType",
+      "compoundName",
+      "experimentalCondition",
+      "modelSystemName"
+      ]
     , axis = 1)
+
+
+
+# final_df = final_df.drop(
+#     ["summary_x",
+#      "summarySource",
+#      "featured_x",
+#      "consortium_x",
+#      "fundingAgency_y",
+#      "featured_y",
+#      "tumorType_y",
+#      "etag"]
+#     , axis = 1)
 
 
 # In[41]:
@@ -383,21 +409,36 @@ final_df.columns
 
 # In[42]:
 
-
 final_df.rename(columns={
     "fundingAgency_x":"fundingAgency",
-    "tumorType_x":"tumorType", 
+    "tumorType_x":"tumorType",
     "projectName":'name_project',
     "isCellLine":"cellLine",
-    "consortium_y" : "consortium"},
+    "consortium_y" : "consortium",
+    "summary_x" : "summary",
+    "studyName_x" : "studyName",
+    "studyId_x" : "studyId",
+    "manifestation_x" : "manifestation",
+    "diseaseFocus_x": "diseaseFocus"},
                 inplace=True)
+
+
+final_df.loc[final_df['studyName'].isin(nf1)]
+
+# final_df.rename(columns={
+#     "fundingAgency_x":"fundingAgency",
+#     "tumorType_x":"tumorType",
+#     "projectName":'name_project',
+#     "isCellLine":"cellLine",
+#     "consortium_y" : "consortium"},
+#                 inplace=True)
 
 
 # In[43]:
 
 
 # annotate tools files to be a resourceType tool - for now
-final_df.loc[final_df.summary_y.isin(list(dfs[3].summary)), 'resourceType'] = 'tool'
+final_df.loc[final_df.summary.isin(list(dfs[3].summary)), 'resourceType'] = 'tool'
 
 
 # In[44]:
@@ -419,6 +460,7 @@ else:
 
 # In[46]:
 
+print(list(final_df.columns))
 
 # check types
 col_types = [col for col in list( final_df.columns ) if final_df[col].dtype == numpy.float64]
@@ -460,8 +502,13 @@ cols = ['createdOn_file','modifiedOn_file','readPair']
 syn = synapseclient.Synapse()
 syn.login()
 
-# results = syn.tableQuery("select * from syn18956617") #current 
-table = synapseclient.table.build_table("CTF Project Information Integration", 'syn4984604', final_df)
+existing_table="syn19040577"
+rowset=syn.tableQuery("select * from "+existing_table)
+syn.delete(rowset)
+
+# results = syn.tableQuery("select * from syn18956617") #current
+#table = synapseclient.table.build_table("CTF Project Information Integration", 'syn4984604', final_df)
+table=syn.store(synapseclient.table.Table(existing_table,final_df))
 
 
 
@@ -469,5 +516,4 @@ table = synapseclient.table.build_table("CTF Project Information Integration", '
 # In[50]:
 
 
-table = syn.store(table)
-
+#table = syn.store(table)

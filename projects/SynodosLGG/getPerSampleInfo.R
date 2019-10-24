@@ -2,7 +2,7 @@ require(tidyverse)
 require(synapser)
 synLogin()
 tab<-synapser::synTableQuery("SELECT * FROM syn18416527 WHERE ( ( \"synapseProject\" = 'syn5698493' ) )")$asDataFrame()
-
+tab$race_ethnicity[which(tab$race_ethnicity=="White/Ethnicity Unknown")]<-'Unknown'
 ##reducing by mol.data
 have.mol<-synapser::synTableQuery("SELECT Synodos_ID,methylationSubtype FROM syn18420940 where Include_manuscript = 1")$asDataFrame()
 
@@ -106,12 +106,15 @@ tab<-tab%>%left_join(loc,by='individualID')
 
 cnames=c('age_biopsy_year','sex','race_ethnicity','nf1_inheritance','binnedBiopsySite','binnedHisRead','biopsyReason','prior/post Treatment','clinical_status','hasOtherMutation','methylationSubtype')
 
+tab$groupedBiopsySite=sapply(tab$binnedBiopsySite,function(x){
+  if(x%in%(c("Brainstem","Midline")))
+    return('Brainstem/Midline')
+  else
+    return(x)
+})
+write.tables=FALSE
+if(write.tables){
 tab1<-factor.generator(tab,cnames)
-
-#tab1=tab%>%group_by(binnedBiopsySite,binnedHisRead,sex,nf1_inheritance,clinical_status,hasOtherMutation)%>%
-#  mutate(totalNum=n_distinct(individualID),meanAge=mean(age_biopsy_year),minAge=min(age_biopsy_year),maxAge=max(age_biopsy_year))%>%
-#  select(totalNum,meanAge,minAge,maxAge)%>%
-#  count(sex,nf1_inheritance,clinical_status,hasOtherMutation,meanAge,minAge,maxAge)%>%spread(sex,n)
 
 write.csv(tab1,'tab1_allSampleDemographics.csv',row.names = F)
 #table2
@@ -123,13 +126,6 @@ write.csv(tab2,'tab2_lggPA_vs_otherDemographics.csv',row.names = F)
 
 tab3=factor.by.group(tab,cnames,'LGG')
 write.csv(tab3,'tab2_lgg_vs_hggDemographics.csv',row.names = F)
-
-
-#tab3<-factor.by.group(subset(tab,LGG!='HGG - All'),cnames,'priorTreatment')
-#write.csv(tab3,'tab3_priorTreatment_otherDemo.csv',row.names = F)
-#tab4<-factor.by.group(subset(tab,LGG!='HGG - All'),cnames,'postTreatment')
-#write.csv(tab4,'tab3_postTreatment_otherDemo.csv',row.names = F)
-#tab$anyTreatment=apply(tab,1,function(x) ifelse(x[['priorTreatment']]=='Yes'||x[['postTreatment']]=='Yes','Yes','No'))
 
 tab5<-factor.by.group(subset(tab,LGG!='HGG - All'),cnames,'prior/post Treatment')
 
@@ -167,12 +163,7 @@ write.csv(tab9,'tab9_isPANonHGGsubtype.csv')
 ##last tab? 
 #OPHG (14 subjects/14 samples) vs Cortex (20 subjects/21 samples) vs Cerebellar/PF NOS (12 subjects/13 samples ) vs Brainstem/Midline together (8 subjects/8 samples)
 
-new.tab$groupedBiopsySite=sapply(new.tab$binnedBiopsySite,function(x){
-  if(x%in%(c("Brainstem","Midline")))
-    return('Brainstem/Midline')
-  else
-    return(x)
-})
+
 tab11<-factor.by.group(new.tab,cnames,'groupedBiopsySite')
 write.csv(tab11,'tab11_groupedBiopsySite.csv')
 
@@ -190,66 +181,90 @@ write.csv(tab14,'tab14_ageBin2.csv')
 tab15<-factor.by.group(new.tab,cnames,'ageBin3')
 write.csv(tab15,'tab15_ageBin3.csv')
 
-
+}
 #TODO: mutation heatmap with clinical data
 
 if(require(survminer)){
+  lgg.only<-which(tab$binnedHisRead!='HGG - GBM')
+  
 #biopsy in months
 biop_month=tab$age_biopsy_year*12+mod(tab$age_biopsy_month,12)
 #followupin months
 follow_month=tab$age_last_follow_up_year*12+mod(tab$age_last_follow_up_month,12)
 
-surv_month=sapply(follow_month-biop_month,function(x) max(0,x))
+##months since biopsy
+surv_month=follow_month-biop_month#sapply(follow_month-biop_month,function(x) max(0,x))
 
 #death
 death=ifelse(is.na(tab$age_death_year*12+mod(tab$age_death_month,12)),FALSE,TRUE)
 
+#no.hgg=
 ##create  new df, with each of the comparisons that michael wants.
 surv.df<-data.frame(diag=biop_month,follow=follow_month,event=!is.na(death),
   surv_month=surv_month,
-  BiopsySite=ifelse(new.tab$groupedBiopsySite%in%c('OPHG','Ventricle'),'OPHGCortical',new.tab$groupedBiopsySite),
+  BiopsySite=ifelse(tab$groupedBiopsySite%in%c('OPHG','Ventricle'),'OPHGCortical',tab$groupedBiopsySite),
   Histology=ifelse(tab$binnedHisRead=='HGG - GBM','HGG','LGG'),
   PA_histology=ifelse(tab$binnedHisRead=='LGG - PA','LGG - PA',ifelse(tab$binnedHisRead == 'HGG - GBM','HGG','LGG Other')),
-  MethylationPA=ifelse(tab$methylationSubtype=='PA','PA','nonPA'),
   MethylationHGGAPA=ifelse(tab$methylationSubtype%in%c('GBM','APA'),'HGGAPA','Other'),
   MethylationHggApaLgg=ifelse(tab$methylationSubtype%in%c('GBM','APA'),'HGGAPA',ifelse(tab$methylationSubtype=='PA','PA','NonPAother')),
+  MethylationPA=ifelse(tab$methylationSubtype=='PA','PA','nonPA'),
   OtherMutation=tab$hasOtherMutation)
 
+
+lgg.df<-data.frame(diag=biop_month[lgg.only],
+  follow=follow_month[lgg.only],
+  event=!is.na(death[lgg.only]),
+  MethylationPA=ifelse(tab[lgg.only,]$methylationSubtype=='PA','PA','nonPA'),
+  OtherMutation=tab[lgg.only,]$hasOtherMutation)
+
+
 #create list of formulas
-formulas<-list(biopsySite=survival::Surv(surv_month,event)~BiopsySite,
-  histology=survival::Surv(surv_month,event)~Histology,
-  histologyPA=survival::Surv(surv_month,event)~PA_histology,
-  methylationPA=survival::Surv(surv_month,event)~MethylationPA,
-  MethylationHGGAPA=survival::Surv(surv_month,event)~MethylationHGGAPA,
-  MethylationHggApaLgg=survival::Surv(surv_month,event)~MethylationHggApaLgg,
-  OtherMutation=survival::Surv(surv_month,event)~OtherMutation)
+formulas<-list(biopsySite=survival::Surv(surv_month,death,type='right')~BiopsySite,
+  histology=survival::Surv(surv_month,death,type='right')~Histology,
+  histologyPA=survival::Surv(surv_month,death,type='right')~PA_histology,
+  MethylationPA=survival::Surv(surv_month,death,type='right')~MethylationPA,
+  MethylationHGGAPA=survival::Surv(surv_month,death,type='right')~MethylationHGGAPA,
+  MethylationHggApaLgg=survival::Surv(surv_month,death,type='right')~MethylationHggApaLgg,
+  OtherMutation=survival::Surv(surv_month,death,type='right')~OtherMutation)
 
-left.formulas<-list(biopsySite=survival::Surv(diag,follow,event)~BiopsySite,
-  histology=survival::Surv(diag,follow,event)~Histology,
-  histologyPA=survival::Surv(diag,follow,event)~PA_histology,
-  methylationPA=survival::Surv(diag,follow,event)~MethylationPA,
-  MethylationHGGAPA=survival::Surv(diag,follow,event)~MethylationHGGAPA,
-  MethylationHggApaLgg=survival::Surv(diag,follow,event)~MethylationHggApaLgg,
-  OtherMutation=survival::Surv(diag,follow,event)~OtherMutation)
+
 fit=surv_fit(formulas,data=surv.df)
-#surv_pvalue(fit)
-res=ggsurvplot_list(fit,data=surv.df,risk.table=F,surv.median.line='v',pval=T,conf.int=F)
-
+res=ggsurvplot_list(fit,data=surv.df,risk.table=F,pval=T,cumevents=F)
 names(res)<-sapply(names(res),function(x) unlist(strsplit(x,split='::'))[2])
 
+
 for(k in names(res)){
-#  print(k)
-  pdf(paste0(k,'_km.pdf'),width=10)
+  #  print(k)
+  pdf(paste0(k,'_all_km.pdf'),width=10)
   print(res[[k]],newpage=FALSE)
   dev.off()
 }
 
+lgg.surv=surv_month[lgg.only]
+lgg.death=death[lgg.only]
+lgg.formula<-list(MethylationPA=survival::Surv(lgg.surv,as.numeric(lgg.death),type='right')~MethylationPA,
+  OtherMutation=survival::Surv(lgg.surv,as.numeric(lgg.death),type='right')~OtherMutation)
+
+lgg.fit=surv_fit(lgg.formula,data=lgg.df)
+#surv_pvalue(fit)
+##toDO: add in N
+##todo: remove median survival, add in text. 
+
+res2=ggsurvplot_list(lgg.fit,data=lgg.df,risk.table=F,pval=T,conf.int=F)
+names(res2)<-sapply(names(res2),function(x) unlist(strsplit(x,split='::'))[2])
+
+for(k in names(res2)){
+  #  print(k)
+  pdf(paste0(k,'_LGG_km.pdf'),width=10)
+  print(res2[[k]],newpage=FALSE)
+  dev.off()
+}
 resultsdir='syn18423589'
 #store images here
 this.script='https://raw.githubusercontent.com/Sage-Bionetworks/nfResources/master/projects/SynodosLGG/getPerSampleInfo.R'
 files=c(dir('.')[grep('pdf',dir('.'))], dir('.')[grep('tab',dir('.'))])
 tabId='syn18416527'
 
-for(f in files)
-  synStore(File(f,parentId=resultsdir),used=tabId,executed=this.script)
+for(f in files){}
+#  synStore(File(f,parentId=resultsdir),used=tabId,executed=this.script)
 }

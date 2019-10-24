@@ -1,4 +1,3 @@
-
 # coding: utf-8
 
 # In[1]:
@@ -96,7 +95,7 @@ p_atr = ['projectName',
 ### from table syn16787123
 p_view_atr = ['projectName',
               'id',
-              'projectFileviewId',
+              'studyFileviewId',
               'projectStatus',
               'dataStatus',
               'fundingAgency',
@@ -138,7 +137,7 @@ f_atr = ['id',
         'createdOn',
         'modifiedOn']
 
-# csbc project info integration 
+# csbc project info integration
 csbc_atr = ["projectId",
             "name_project",
             "consortium",
@@ -196,7 +195,7 @@ csbc_atr = ["projectId",
             "softwareType",
             "species",
             "specimenID",
-            "study",
+            "studyName",
             "tissue",
             "transcriptQuantificationMethod",
             "transplantationDonorSpecies",
@@ -256,7 +255,7 @@ len(set(dfs[1].projectId.unique()) - set(dfs[0].projectId.unique()))
 
 
 # Associate publications information to projects
-project_info_df = pandas.merge(dfs[1], dfs[0], on=['projectId','projectName', 'fundingAgency', 'diseaseFocus', 'tumorType'], how='left')
+project_info_df = pandas.merge(dfs[1].drop(['featured'],axis=1), dfs[0].drop(['featured'],axis=1), on=['projectId','projectName', 'fundingAgency', 'diseaseFocus', 'tumorType','studyName','studyId','manifestation'], how='left')
 
 
 # In[12]:
@@ -271,14 +270,14 @@ project_info_df
 project_info_df = project_info_df[
     [ 'projectName',
      'projectId',
-     'projectFileviewId',
+     'studyFileviewId',
      'dataStatus',
      'fundingAgency',
      'projectLeads',
      'institutions',
      'tumorType',
      'diseaseFocus',
-     'citation', 
+     'citation',
      'doi']
 ]
 
@@ -307,10 +306,10 @@ dfs[1]['publication_geodata_produced'] = 0  ### don't have data location...run g
 
 # File attributes
 # remove tools files (subset of all datafiles) from all datafiles
-tools_files_id = list(set(dfs[2]["id"].unique()).intersection(set(dfs[3]["study"].unique())))
+tools_files_id = list(set(dfs[2]["id"].unique()).intersection(set(dfs[3]["studyId"].unique())))
 
 # no files that are also tools for NTAP
-list(set(dfs[3]["study"].unique()).intersection( set(dfs[2]["id"].unique())))
+list(set(dfs[3]["studyId"].unique()).intersection( set(dfs[2]["id"].unique())))
 
 
 # In[18]:
@@ -319,7 +318,7 @@ list(set(dfs[3]["study"].unique()).intersection( set(dfs[2]["id"].unique())))
 dfs[2].rename(index=str, columns={"id": "fileId", "name": "name_file", "createdOn": "createdOn_file",
                                   "modifiedOn": "modifiedOn_file", "modifiedBy": "modifiedBy_file"}, inplace=True)
 dfs[3].rename(index=str, columns={"id": "fileId", "name": "name_file", "createdOn": "createdOn_file",
-                                  "modifiedOn": "modifiedOn_file", "modifiedBy": "modifiedBy_file", "study" :"projectId"}, inplace=True)
+                                  "modifiedOn": "modifiedOn_file", "modifiedBy": "modifiedBy_file", "studyName" :"projectId"}, inplace=True)
 
 
 # In[19]:
@@ -360,14 +359,20 @@ final_df = pandas.merge( dfs[1], file_info_df, on= ['projectId'], how='left')
 
 
 final_df = final_df.drop(
-    ["summary_x",
+    ["summary_y",
      "summarySource",
      "featured_x",
      "consortium_x",
      "fundingAgency_y",
      "featured_y",
      "tumorType_y",
-     "etag"]
+     "etag",
+     "studyName_y",
+      "consortium_x",
+      "studyId_y",
+      "manifestation_y",
+      "diseaseFocus_y"
+      ]
     , axis = 1)
 
 
@@ -382,18 +387,22 @@ final_df.columns
 
 final_df.rename(columns={
     "fundingAgency_x":"fundingAgency",
-    "tumorType_x":"tumorType", 
+    "tumorType_x":"tumorType",
     "projectName":'name_project',
     "isCellLine":"cellLine",
-    "consortium_y" : "consortium"},
-                inplace=True)
+    "consortium_y" : "consortium",
+    "summary_x" : "summary",
+    "studyName_x" : "studyName",
+    "studyId_x" : "studyId",
+    "manifestation_x" : "manifestation",
+    "diseaseFocus_x": "diseaseFocus"}                inplace=True)
 
 
 # In[27]:
 
 
 # annotate tools files to be a resourceType tool - for now
-final_df.loc[final_df.summary_y.isin(list(dfs[3].summary)), 'resourceType'] = 'tool'
+final_df.loc[final_df.summary.isin(list(dfs[3].summary)), 'resourceType'] = 'tool'
 
 
 # In[37]:
@@ -452,11 +461,6 @@ cols = ['createdOn_file','modifiedOn_file','readPair']
 # In[40]:
 
 
-### parent is NTAP now
-table = synapseclient.table.build_table("NTAP Project Information Integration", 'syn4939478', final_df)
-
-
-# In[41]:
 
 
 syn = synapseclient.Synapse()
@@ -466,5 +470,13 @@ syn.login()
 # In[42]:
 
 
-table = syn.store(table)
+###current table is NTAP
+existing_table="syn18496443"
+rowset=syn.tableQuery("select * from "+existing_table)
+syn.delete(rowset)
 
+#table = synapseclient.table.build_table("NTAP Project Information Integration", 'syn4939478', final_df)
+table=syn.store(synapseclient.table.Table(existing_table,final_df))
+
+# In[41]:
+#table = syn.store(table)
