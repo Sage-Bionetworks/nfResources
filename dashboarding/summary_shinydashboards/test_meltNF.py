@@ -395,8 +395,8 @@ final_df.rename(columns={
     "studyName_x" : "studyName",
     "studyId_x" : "studyId",
     "manifestation_x" : "manifestation",
-    "diseaseFocus_x": "diseaseFocus"}                inplace=True)
-
+    "diseaseFocus_x": "diseaseFocus"} ,               inplace=True)
+### added , to rename 
 
 # In[27]:
 
@@ -460,15 +460,11 @@ cols = ['createdOn_file','modifiedOn_file','readPair']
 
 # In[40]:
 
-
-
-
 syn = synapseclient.Synapse()
 syn.login()
 
 
 # In[42]:
-
 
 ###current table is NTAP
 existing_table="syn18496443"
@@ -476,7 +472,27 @@ rowset=syn.tableQuery("select * from "+existing_table)
 syn.delete(rowset)
 
 #table = synapseclient.table.build_table("NTAP Project Information Integration", 'syn4939478', final_df)
+### Table takes in the schema and values (here as a dataframe )
 table=syn.store(synapseclient.table.Table(existing_table,final_df))
+
+# %%
+cols = syn.getTableColumns(existing_table)
+
+# %%
+lst = list(cols)
 
 # In[41]:
 #table = syn.store(table)
+schema = synapseclient.Schema(columns=lst, parent = "syn4939478")
+
+# %%
+print(schema)
+
+# %%
+synapseclient.table.Table(schema,final_df)
+
+
+# %%
+synapseclient.table.Table( synapseclient.Schema(columns=lst, parent = "syn4939478") , final_df)
+
+
