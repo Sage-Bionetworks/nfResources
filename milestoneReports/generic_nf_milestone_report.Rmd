@@ -54,19 +54,17 @@ test_name_deliverables <- subset(deliverables_survery, deliverables_survery$`Pro
 
 if(nrow(test_name_deliverables)==0){
   test_name_deliverables=data.frame(
-      `dummy1`='dummy',
-      `dummy2`='dummy',
       `Project Name`=projectname,
       `Milestone (months)`=milestone,
-      `Assay`=unique(six_mo_fileview$assay),
-      `Proposed Number of Samples`=0)
+      `Assay`=ifelse(length(unique(six_mo_fileview$assay)==0),"",paste(unique(six_mo_fileview$assay),sep=',')),
+      `Proposed Number of Samples`=0,check.names=F)
 }
 
 #get first assay listed (brightfield microscopy )
 six_mo_brightfield <- subset(six_mo_fileview, six_mo_fileview$assay == test_name_deliverables$Assay)
 
 if(nrow(six_mo_brightfield)==0){
-  colnames(test_name_deliverables)[6] <- "Proposed number of samples"
+  #colnames(test_name_deliverables)[6] <- "Proposed number of samples"
   test_name_deliverables$`Actual number of samples` <- 0
 
 }else if ( !is.na(six_mo_brightfield$isMultiSpecimen)) { #for multispecimen samps
@@ -82,7 +80,7 @@ if(nrow(six_mo_brightfield)==0){
     counter = counter + length(nums)
   }
   ### how many specimen IDs there are seperated by commas only though
-  colnames(test_name_deliverables)[6] <- "Proposed number of samples"
+#  colnames(test_name_deliverables)[6] <- "Proposed number of samples"
   test_name_deliverables$`Actual number of samples` <- counter
 
 } else{

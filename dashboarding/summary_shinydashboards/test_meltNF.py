@@ -371,7 +371,8 @@ final_df = final_df.drop(
       "consortium_x",
       "studyId_y",
       "manifestation_y",
-      "diseaseFocus_y"
+      "diseaseFocus_y",
+      "isXenograft"
       ]
     , axis = 1)
 
@@ -396,7 +397,7 @@ final_df.rename(columns={
     "studyId_x" : "studyId",
     "manifestation_x" : "manifestation",
     "diseaseFocus_x": "diseaseFocus"} ,               inplace=True)
-### added , to rename 
+### added , to rename
 
 # In[27]:
 
@@ -494,5 +495,3 @@ synapseclient.table.Table(schema,final_df)
 
 # %%
 synapseclient.table.Table( synapseclient.Schema(columns=lst, parent = "syn4939478") , final_df)
-
-
