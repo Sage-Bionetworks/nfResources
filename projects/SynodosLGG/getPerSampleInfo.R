@@ -1,20 +1,17 @@
 require(tidyverse)
 require(synapser)
 synLogin()
-tab<-synapser::synTableQuery("SELECT * FROM syn18416527 WHERE ( ( \"synapseProject\" = 'syn5698493' ) )")$asDataFrame()
+tab<-synapser::synTableQuery("SELECT * FROM syn18416527 WHERE ( ( \"synapseProject\" = 'syn5698493' ) )")$asDataFrame()%>%
+  select(-c(ROW_ID,ROW_VERSION))
+
 tab$race_ethnicity[which(tab$race_ethnicity=="White/Ethnicity Unknown")]<-'Unknown'
 ##reducing by mol.data
-have.mol<-synapser::synTableQuery("SELECT Synodos_ID,methylationSubtype FROM syn18420940 where Include_manuscript = 1")$asDataFrame()
+have.mol<-synapser::synTableQuery("SELECT Synodos_ID,methylationSubtype FROM syn18420940 where Include_manuscript = 1")$asDataFrame()%>%
+  select(-c(ROW_ID,ROW_VERSION))
 
-#TODO: move 2 65yos
-oldies<-which(tab$age_biopsy_year>25)
-if(length(oldies)>0)
-  tab<-tab[-oldies,]
 
-#TODO: remove 005
-tab<-tab[!tab$individualID%in%c("SYN_NF_005"),]
 tab<-mutate(tab,ageInMonths=age_biopsy_year*12+round(age_biopsy_month%%12))
-
+print(dim(tab))
 ##upload reason bins
 
 #re-order binned his read
@@ -29,8 +26,10 @@ tab$binnedHisRead=factor(tab$binnedHisRead,levels=c("LGG - PA",
   "HGG - GBM"))
 
 overlaps<-intersect(tab$individualID,have.mol$Synodos_ID)
+
 print(paste('have',length(overlaps),'patients with molecular and clinical data'))
-tab<-subset(tab,individualID%in%overlaps)%>%left_join(rename(have.mol,individualID='Synodos_ID'),by='individualID')
+tab<-tab%>%left_join(rename(have.mol,individualID='Synodos_ID'),by='individualID')
+
 
 
 ##SECOND HIT
@@ -99,7 +98,7 @@ factor.generator<-function(tab,cnames){
 
 
 library(readxl)
-loc<-read_xls("~/Downloads/Synodos_Sage Data_updated binned_7-8-19.xls")%>%select(individualID,binnedReasonBiopsy,reason_biopsy)%>%unique()
+loc<-read_xls("Synodos_Sage Data_updated binned_10-25-19.xls")%>%select(individualID,binnedReasonBiopsy,reason_biopsy)%>%unique()
 ##now what do i do? 
 loc$biopsyReason=sapply(loc$binnedReasonBiopsy,function(x) unlist(strsplit(x,split=':'))[1])
 tab<-tab%>%left_join(loc,by='individualID')
@@ -112,6 +111,20 @@ tab$groupedBiopsySite=sapply(tab$binnedBiopsySite,function(x){
   else
     return(x)
 })
+
+#tab<-tab%>%select(-c(ROW_ID,ROW_VERSION))
+
+write_excel_csv2(tab,paste('synodos_lgg_nf1',lubridate::today(),'_data.csv',sep=''),delim=',')
+
+#TODO: move 2 65yos
+oldies<-which(tab$age_biopsy_year>25)
+if(length(oldies)>0)
+  tab<-tab[-oldies,]
+
+#TODO: remove 005
+tab<-tab[!tab$individualID%in%c("SYN_NF_005"),]%>%
+  subset(individualID%in%overlaps)
+
 write.tables=FALSE
 if(write.tables){
 tab1<-factor.generator(tab,cnames)
